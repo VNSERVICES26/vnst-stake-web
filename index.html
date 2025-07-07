@@ -11,8 +11,8 @@
 <body>
     <nav class="navbar">
         <img src="assets/logo.png" alt="VNST Logo" class="logo">
-        <div class="menu-toggle">☰</div>
-        <ul>
+        <div class="menu-toggle" id="mobile-menu">☰</div>
+        <ul class="nav-list" id="nav-list">
             <li><a href="index.html" class="active">Home</a></li>
             <li><a href="staking.html">Staking</a></li>
             <li><a href="team.html">Team</a></li>
@@ -27,7 +27,7 @@
             <div class="cards-container">
                 <div class="card">
                     <h3>Total Staked VNST</h3>
-                    <p id="totalStaked">0 VNST</p>
+                    <p id="totalStaked">Loading...</p>
                     <p>Across all users</p>
                 </div>
                 
@@ -69,5 +69,11 @@
     </footer>
 
     <script src="script.js"></script>
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu').addEventListener('click', function() {
+            document.getElementById('nav-list').classList.toggle('show');
+        });
+    </script>
 </body>
 </html>
