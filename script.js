@@ -14,56 +14,34 @@ let accounts = [];
 let vnstTokenContract;
 let vnstStakingContract;
 let usdtTokenContract;
-let currentNetworkId;
 
 // Initialize Web3
 async function initWeb3() {
     if (window.ethereum) {
-        web3 = new Web3(window.ethereum);
         try {
-            // Request account access
+            web3 = new Web3(window.ethereum);
             accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-            
-            // Get network ID
-            currentNetworkId = await web3.eth.net.getId();
             
             // Initialize contracts
             vnstTokenContract = new web3.eth.Contract(vnstTokenABI, vnstTokenAddress);
             vnstStakingContract = new web3.eth.Contract(vnstStakingABI, vnstStakingAddress);
             usdtTokenContract = new web3.eth.Contract(usdtTokenABI, usdtTokenAddress);
             
-            // Update UI
             updateWalletUI();
             await loadStakingData();
             
-            // Set up event listeners
-            window.ethereum.on('accountsChanged', (newAccounts) => {
-                accounts = newAccounts;
-                updateWalletUI();
-                loadStakingData();
-            });
-            
-            window.ethereum.on('chainChanged', () => {
-                window.location.reload();
-            });
-            
         } catch (error) {
-            console.error("User denied account access", error);
-            showMessage("Please connect your wallet to continue", "error");
+            console.error("Error initializing Web3:", error);
+            showMessage("Error connecting wallet: " + error.message, "error");
         }
-    } else if (window.web3) {
-        web3 = new Web3(window.web3.currentProvider);
-        showMessage("Please update your MetaMask to the latest version", "error");
     } else {
-        showMessage("Non-Ethereum browser detected. Please install MetaMask", "error");
+        showMessage("Please install MetaMask!", "error");
     }
 }
 
 // Update wallet UI
 function updateWalletUI() {
     const walletConnectBtn = document.getElementById('walletConnectBtn');
-    if (!walletConnectBtn) return;
-
     if (accounts.length > 0) {
         const shortAddress = `${accounts[0].substring(0, 6)}...${accounts[0].substring(38)}`;
         walletConnectBtn.textContent = shortAddress;
@@ -81,8 +59,7 @@ async function loadStakingData() {
     try {
         // Get VNST balance
         const balance = await vnstTokenContract.methods.balanceOf(accounts[0]).call();
-        const vnstBalanceElement = document.getElementById('vnstBalance');
-        if (vnstBalanceElement) vnstBalanceElement.textContent = web3.utils.fromWei(balance, 'ether');
+        updateElementText('vnstBalance', web3.utils.fromWei(balance, 'ether'));
         
         // Get staking info
         const stakeInfo = await vnstStakingContract.methods.stakes(accounts[0]).call();
@@ -107,14 +84,9 @@ async function loadStakingData() {
         const totalStaked = await vnstStakingContract.methods.getWalletBalances().call();
         updateElementText('totalStaked', web3.utils.fromWei(totalStaked.vnstStakingBalance, 'ether') + " VNST");
         
-        // Load team data if on team page
-        if (window.location.pathname.includes('team.html')) {
-            await loadTeamData();
-        }
-        
     } catch (error) {
         console.error("Error loading staking data:", error);
-        showMessage("Error loading staking data", "error");
+        showMessage("Error loading data: " + error.message, "error");
     }
 }
 
@@ -124,29 +96,97 @@ function updateElementText(id, text) {
     if (element) element.textContent = text;
 }
 
+// Button Functions
+async function approveMax() {
+    try {
+        const maxAmount = await vnstStakingContract.methods.maxStakeAmount().call();
+        await vnstTokenContract.methods.approve(vnstStakingAddress, maxAmount)
+            .send({ from: accounts[0], gas: 300000 });
+        showMessage("Approval successful!", "success");
+    } catch (error) {
+        showMessage("Approval failed: " + error.message, "error");
+    }
+}
+
+async function stakeVNST() {
+    const amount = document.getElementById('stakeAmount').value;
+    const referrer = document.getElementById('referralAddress').value || "0x0000000000000000000000000000000000000000";
+    
+    try {
+        await vnstStakingContract.methods.stake(
+            web3.utils.toWei(amount, 'ether'),
+            referrer
+        ).send({ from: accounts[0], gas: 300000 });
+        
+        showMessage("Staking successful!", "success");
+        await loadStakingData();
+    } catch (error) {
+        showMessage("Staking failed: " + error.message, "error");
+    }
+}
+
+async function claimVNT() {
+    try {
+        await vnstStakingContract.methods.claimRewards()
+            .send({ from: accounts[0], gas: 300000 });
+        showMessage("VNT claimed successfully!", "success");
+        await loadStakingData();
+    } catch (error) {
+        showMessage("Claim failed: " + error.message, "error");
+    }
+}
+
+async function claimUSDT() {
+    try {
+        await vnstStakingContract.methods.claimRewards()
+            .send({ from: accounts[0], gas: 300000 });
+        showMessage("USDT claimed successfully!", "success");
+        await loadStakingData();
+    } catch (error) {
+        showMessage("Claim failed: " + error.message, "error");
+    }
+}
+
+function copyReferralLink() {
+    if (!accounts.length) {
+        showMessage("Please connect wallet first", "error");
+        return;
+    }
+    const link = `${window.location.origin}/staking.html?ref=${accounts[0]}`;
+    navigator.clipboard.writeText(link)
+        .then(() => showMessage("Referral link copied!", "success"))
+        .catch(() => showMessage("Failed to copy", "error"));
+}
+
+function showMessage(message, type) {
+    const messageElement = document.createElement('div');
+    messageElement.className = `${type}-message`;
+    messageElement.textContent = message;
+    document.body.appendChild(messageElement);
+    
+    setTimeout(() => {
+        messageElement.remove();
+    }, 5000);
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Connect wallet button
-    const walletConnectBtn = document.getElementById('walletConnectBtn');
-    if (walletConnectBtn) {
-        walletConnectBtn.addEventListener('click', initWeb3);
-    }
+    document.getElementById('walletConnectBtn').addEventListener('click', initWeb3);
+    
+    // Staking page buttons
+    document.getElementById('approveMaxBtn')?.addEventListener('click', approveMax);
+    document.getElementById('stakeBtn')?.addEventListener('click', stakeVNST);
+    document.getElementById('claimTokenBtn')?.addEventListener('click', claimVNT);
+    document.getElementById('claimUsdtBtn')?.addEventListener('click', claimUSDT);
+    document.getElementById('copyReferralBtn')?.addEventListener('click', copyReferralLink);
     
     // Check for referral in URL
     if (window.location.pathname.includes('staking.html')) {
         const urlParams = new URLSearchParams(window.location.search);
         const ref = urlParams.get('ref');
         if (ref) {
-            const referralAddress = document.getElementById('referralAddress');
-            if (referralAddress) referralAddress.value = ref;
+            document.getElementById('referralAddress').value = ref;
         }
     }
-    
-    // Initialize cards animation
-    const cards = document.querySelectorAll('.card');
-    cards.forEach((card, index) => {
-        setTimeout(() => {
-            card.classList.add('visible');
-        }, index * 200);
-    });
 });
