@@ -670,3 +670,37 @@ logo.png
 metamask.svg
 site.webmanifest
 walletconnect.svg 
+
+/* Add this to your existing CSS */
+.nav-list {
+    display: flex;
+    list-style: none;
+    gap: 1.8rem;
+    transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+    .nav-list {
+        flex-direction: column;
+        display: none;
+        width: 100%;
+        text-align: center;
+        margin-top: 1rem;
+        gap: 1rem;
+    }
+    
+    .nav-list.show {
+        display: flex;
+    }
+}
+
+.card {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.5s ease-out;
+}
+
+.card.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
